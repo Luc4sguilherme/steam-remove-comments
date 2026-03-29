@@ -2,13 +2,11 @@ import ProgressBar from 'cli-progress';
 import _ from 'lodash';
 import util from 'util';
 
+import config from '../config/main.js';
+import getMyComments from './getMyComments.js';
 import log from './log.js';
 import { client, community } from './steamClient.js';
-
-const getComments = util.promisify(community.getUserComments.bind(community));
-const deleteComments = util.promisify(
-  community.deleteUserComment.bind(community)
-);
+import { delay } from './utils.js';
 
 const progressBar = new ProgressBar.Bar({
   format: 'Removing comments [{bar}] {percentage}% ',
@@ -19,30 +17,74 @@ const progressBar = new ProgressBar.Bar({
   emptyOnZero: true,
 });
 
-export default async () => {
+const getCommentsOnMyProfile = util.promisify(
+  community.getUserComments.bind(community)
+);
+const getCommentsMadeByMe = util.promisify(getMyComments(community));
+const deleteComment = util.promisify(
+  community.deleteUserComment.bind(community)
+);
+
+async function getComments(mode, steamId) {
+  if (mode === 1) {
+    return getCommentsMadeByMe();
+  }
+
+  const comments = await getCommentsOnMyProfile(steamId);
+  return comments.map((comment) => ({
+    steamId,
+    commentId: comment.id,
+  }));
+}
+
+export default async (mode) => {
   try {
-    const comments = await getComments(client.steamID);
+    const modeLabel =
+      mode === 1
+        ? 'comments you made on other profiles'
+        : 'comments made on this profile';
+
+    log.info(`Fetching ${modeLabel}...`);
+
+    const comments = await getComments(mode, client.steamID);
+
+    if (comments.length === 0) {
+      log.info('No comments found to remove.');
+      return;
+    }
+
+    log.info(`Found ${comments.length} comment(s). Starting removal...`);
+
     let commentsRemoved = 0;
 
+    console.clear();
     progressBar.start(comments.length, 0);
 
     const task = async (comment) => {
-      await deleteComments(client.steamID, comment.id);
+      await deleteComment(comment.steamId, comment.commentId);
       progressBar.increment();
       commentsRemoved += 1;
     };
 
-    for (const chunk of _.chunk(comments, 10)) {
-      await Promise.allSettled(chunk.map(task));
+    const chunks = _.chunk(comments, config.batch || 10);
+
+    for (let i = 0; i < chunks.length; i += 1) {
+      await Promise.allSettled(chunks[i].map(task));
+
+      if (i < chunks.length - 1) {
+        await delay(config.delay || 5000);
+      }
     }
 
     progressBar.stop();
 
-    log.info(
-      `Operation performed successfully: ${commentsRemoved} comment(s) removed.`
-    );
+    if (commentsRemoved > 0) {
+      log.info(
+        `Operation completed: ${commentsRemoved}/${comments.length} comment(s) removed successfully.`
+      );
+    }
   } catch (error) {
     console.clear();
-    log.error(error);
+    log.error(`Failed to remove comments: ${error.message || error}`);
   }
 };

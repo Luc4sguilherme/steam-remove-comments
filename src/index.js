@@ -1,4 +1,5 @@
 import moment from 'moment';
+import readline from 'readline';
 import SteamTotp from 'steam-totp';
 import SteamUser from 'steam-user';
 
@@ -6,6 +7,30 @@ import log from './components/log.js';
 import removeComments from './components/removeComments.js';
 import { client, community } from './components/steamClient.js';
 import main from './config/main.js';
+
+function askUser() {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  return new Promise((resolve) => {
+    console.log('\nWhat do you want to do?');
+    console.log('[1] Remove the comments you made on other profiles.');
+    console.log('[2] Remove the comments made on this profile.');
+
+    rl.question('\nChoose an option (1 or 2): ', (answer) => {
+      rl.close();
+      const option = parseInt(answer, 10);
+      if (option === 1 || option === 2) {
+        resolve(option);
+      } else {
+        log.error('Invalid option. Please choose 1 or 2.');
+        process.exit(1);
+      }
+    });
+  });
+}
 
 client.logOn({
   accountName: main.userName,
@@ -23,7 +48,8 @@ client.on('loggedOn', () => {
 client.on('webSession', async (value, cookies) => {
   community.setCookies(cookies);
 
-  await removeComments();
+  const mode = await askUser();
+  await removeComments(mode);
   process.exit(0);
 });
 
