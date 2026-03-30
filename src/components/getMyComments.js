@@ -1,5 +1,7 @@
 import { load } from 'cheerio';
 
+import { delay } from './utils.js';
+
 /**
  * Get all comments made by the currently logged-in user on other users' profiles.
  * Retrieves the comment history HTML pages and collects the comments.
@@ -84,7 +86,9 @@ const getMyComments = (steamcommunity) => (opts, cb) => {
     );
   }
 
-  function fetchHistoryPage(page, initialEndPage) {
+  function fetchHistoryPage(page, initialEndPage, retries = 0) {
+    const maxRetries = 5;
+
     let endPage = initialEndPage;
 
     if (endPage !== null && page > endPage) {
@@ -96,9 +100,12 @@ const getMyComments = (steamcommunity) => (opts, cb) => {
     steamcommunity._myProfile(
       `commenthistory?p=${page}`,
       null,
-      (err, response, body) => {
+      async (err, response, body) => {
         if (err) {
-          if (endPage === null) {
+          if (retries < maxRetries) {
+            await delay(5000 * retries);
+            fetchHistoryPage(page, endPage, retries + 1);
+          } else if (endPage === null) {
             callback(err);
           } else {
             fetchHistoryPage(page + 1, endPage);
