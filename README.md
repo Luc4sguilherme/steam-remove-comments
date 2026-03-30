@@ -1,58 +1,57 @@
-# Linux (ubuntu)
-## 1° Update ubuntu
-<pre>
-  sudo apt update && sudo apt upgrade
-</pre>
+# Steam Remove Comments
 
-## 2° Install Node.js
-<pre>
-  curl -fsSL https://deb.nodesource.com/setup_14.x | sudo -E bash -
+A CLI tool to bulk-remove comments from your Steam profile or comments you've left on other profiles.   
+Built with [React Ink](https://github.com/vadimdemedes/ink) for an interactive terminal UI.
 
-  sudo apt-get install -y nodejs
-</pre>
+## Features
 
-## 3° Install dependencies
-<pre>
-  npm install --production --force
-</pre>
+- **Remove your comments from other profiles** — Scans your comment history and deletes every comment you've posted on other users' profiles.
+- **Remove comments from your profile** — Deletes comments left on your own profile, with filtering options:
+  - Only comments made by others
+  - Only comments made by you
+  - All comments
+- **Batch processing** with configurable concurrency and delay to avoid rate limiting.
+- **Interactive terminal UI** with progress tracking.
 
-## 4° Setting the bot
-- <code>cd src/config</code>
+## Prerequisites
 
-- <code>mv main.example.js main.js</code>
+- [Node.js](https://nodejs.org/) >= 20
+- A Steam account with credentials (username, password, and Steam Guard secrets)
 
-- <code>vim main.js</code>
+## Installation
 
-- Press the key <code>i</code>
+### 1. Clone the repository
 
-- Fill in all empty fields
+```bash
+git clone https://github.com/Luc4sguilherme/steam-remove-comments.git
+cd steam-remove-comments
+```
 
-- Press the key <code>ESC</code>
+### 2. Install dependencies
 
-- Type in keyboard <code>:wq</code>
+```bash
+npm install
+```
 
-- Press <code>Enter</code>
+### 3. Configure your Steam account
 
-## 5° Starting
-<pre>
-  npm start
-</pre>
+Copy the example config and fill in your credentials:
 
-# Windows 10
-## 1° Install Node.js
-<pre>
-  <a href=https://nodejs.org/dist/v14.17.5/node-v14.17.5-x64.msi>https://nodejs.org/dist/v14.17.5/node-v14.17.5-x64.msi</a>
-</pre>
+```bash
+cp src/config/main.example.js src/config/main.js
+```
 
-## 2° Install dependencies
-  - Unzip
-  - run <code>install.bat</code> file
+Edit `src/config/main.js` with your preferred editor:
 
-## 3° Setting the bot
-  - Navigate to <code>src/config</code>
-  - Rename the <code>main.example.js</code> file to <code>main.js</code>
-  - Open the <code>main.js</code> file
-  - Fill in all empty fields
-  
-## 4° Starting
-  - run <code>start.bat</code> file
+
+## Usage
+
+```bash
+npm start
+```
+
+The interactive CLI will guide you through selecting a removal mode and filter options.
+
+## License
+
+MIT © [Lucas Guilherme](https://github.com/Luc4sguilherme)

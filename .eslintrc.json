@@ -5,14 +5,32 @@
   },
   "extends": [
       "airbnb-base", 
+      "plugin:react/recommended",
+      "plugin:react-hooks/recommended",
       "prettier", 
       "plugin:node/recommended"
   ],
   "parserOptions": {
       "ecmaVersion": 12,
-      "sourceType": "module"
+      "sourceType": "module",
+      "ecmaFeatures": {
+        "jsx": true
+      }
   },
-  "plugins": ["prettier", "eslint-plugin-import-helpers"],
+  "plugins": ["prettier", "eslint-plugin-import-helpers", "react", "react-hooks"],
+  "settings": {
+    "react": {
+      "version": "detect"
+    },
+    "node": {
+      "tryExtensions": [".js", ".jsx", ".json"]
+    },
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".jsx"]
+      }
+    }
+  },
   "rules": {
       "prettier/prettier": "error",
       "import-helpers/order-imports": [
@@ -34,12 +52,17 @@
       "no-await-in-loop": "off",
       "no-console": "off",
       "node/no-unpublished-import": "off",
+      "node/no-missing-import": "off",
       "import/extensions": [
         "error",
         "ignorePackages"
       ],
       "no-restricted-syntax": ["error", "FunctionExpression", "WithStatement", "BinaryExpression[operator='in']"],
+      "import/no-unresolved": ["error", { "ignore": ["ink", "ink-spinner"] }],
       "no-process-exit": 0,
-      "no-loop-func": "off"
+      "no-loop-func": "off",
+      "react/react-in-jsx-scope": "off",
+      "react/prop-types": "off",
+      "node/no-unsupported-features/es-syntax": "off"
   }
 }

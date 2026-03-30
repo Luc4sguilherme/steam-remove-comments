@@ -1,6 +1,6 @@
 import { load } from 'cheerio';
 
-import { delay } from './utils.js';
+import { delay } from '../utils/delay.js';
 
 function getEndPage($, fallback) {
   const pageLinks = $('div.pageLinks a.pagelink');
@@ -112,6 +112,7 @@ async function fetchProfile(steamcommunity, url, retries = 0, maxRetries = 5) {
  */
 async function* getMyComments(steamcommunity, options = {}) {
   const visitedProfiles = new Set();
+  const seenComments = new Set();
   let endPage = null;
   let page = options.startPage || 1;
 
@@ -137,7 +138,12 @@ async function* getMyComments(steamcommunity, options = {}) {
 
         if (profileBody !== null) {
           const profileComments = findOwnComments(load(profileBody));
-          comments.push(...profileComments);
+          for (const comment of profileComments) {
+            if (!seenComments.has(comment.commentId)) {
+              seenComments.add(comment.commentId);
+              comments.push(comment);
+            }
+          }
         }
       }
 
