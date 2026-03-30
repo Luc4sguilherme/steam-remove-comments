@@ -61,7 +61,9 @@ const getMyComments = (steamcommunity) => (opts, cb) => {
     return results;
   }
 
-  function processProfiles(profiles, index) {
+  function processProfiles(profiles, index, retries = 0) {
+    const maxRetries = 5;
+
     if (index >= profiles.length) {
       callback(null, allComments);
       return;
@@ -69,9 +71,14 @@ const getMyComments = (steamcommunity) => (opts, cb) => {
 
     steamcommunity.httpRequest(
       profiles[index],
-      (err, response, body) => {
+      async (err, response, body) => {
         if (err) {
-          processProfiles(profiles, index + 1);
+          if (retries < maxRetries) {
+            await delay(1000 * retries);
+            processProfiles(profiles, index, retries + 1);
+          } else {
+            processProfiles(profiles, index + 1);
+          }
           return;
         }
 
