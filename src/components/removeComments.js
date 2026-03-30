@@ -75,8 +75,6 @@ export default async (mode) => {
         if (retries < maxRetries) {
           await delay(1000 * retries);
           task(comment, retries + 1);
-        } else {
-          throw err;
         }
       }
     };
