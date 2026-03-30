@@ -64,10 +64,21 @@ export default async (mode) => {
 
     progressBar.start(comments.length, 0);
 
-    const task = async (comment) => {
-      await deleteComment(comment.steamId, comment.commentId);
-      progressBar.increment();
-      commentsRemoved += 1;
+    const task = async (comment, retries = 0) => {
+      const maxRetries = 5;
+
+      try {
+        await deleteComment(comment.steamId, comment.commentId);
+        progressBar.increment();
+        commentsRemoved += 1;
+      } catch (err) {
+        if (retries < maxRetries) {
+          await delay(1000 * retries);
+          task(comment, retries + 1);
+        } else {
+          throw err;
+        }
+      }
     };
 
     const chunks = _.chunk(comments, config.batch || 10);
