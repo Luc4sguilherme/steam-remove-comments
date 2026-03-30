@@ -1,35 +1,27 @@
+import inquirer from 'inquirer';
 import moment from 'moment';
-import readline from 'readline';
+import ora from 'ora';
 import SteamTotp from 'steam-totp';
 import SteamUser from 'steam-user';
 
-import log from './components/log.js';
 import removeComments from './components/removeComments.js';
 import { client, community } from './components/steamClient.js';
 import main from './config/main.js';
 
-function askUser() {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+async function askUser() {
+  const { mode } = await inquirer.prompt([
+    {
+      type: 'list',
+      name: 'mode',
+      message: 'What do you want to do?',
+      choices: [
+        { name: 'Remove the comments you made on other profiles', value: 1 },
+        { name: 'Remove the comments made on this profile', value: 2 },
+      ],
+    },
+  ]);
 
-  return new Promise((resolve) => {
-    console.log('\nWhat do you want to do?');
-    console.log('[1] Remove the comments you made on other profiles.');
-    console.log('[2] Remove the comments made on this profile.');
-
-    rl.question('\nChoose an option (1 or 2): ', (answer) => {
-      rl.close();
-      const option = parseInt(answer, 10);
-      if (option === 1 || option === 2) {
-        resolve(option);
-      } else {
-        log.error('Invalid option. Please choose 1 or 2.');
-        process.exit(1);
-      }
-    });
-  });
+  return mode;
 }
 
 client.logOn({
@@ -41,12 +33,16 @@ client.logOn({
   shared_secret: main.sharedSecret,
 });
 
+const loginSpinner = ora('Logging into Steam...').start();
+
 client.on('loggedOn', () => {
   client.setPersona(SteamUser.EPersonaState.Online);
+  loginSpinner.text = 'Waiting for web session...';
 });
 
 client.on('webSession', async (value, cookies) => {
   community.setCookies(cookies);
+  loginSpinner.succeed('Logged in successfully!');
 
   const mode = await askUser();
   await removeComments(mode);
@@ -57,15 +53,17 @@ client.on('error', (error) => {
   const minutes = 25;
   const seconds = 5;
 
+  loginSpinner.stop();
+
   switch (error.eresult) {
     case SteamUser.EResult.AccountDisabled:
-      log.error(`This account is disabled!`);
+      loginSpinner.fail(`This account is disabled!`);
       break;
     case SteamUser.EResult.InvalidPassword:
-      log.error(`Invalid Password detected!`);
+      loginSpinner.fail(`Invalid Password detected!`);
       break;
     case SteamUser.EResult.RateLimitExceeded:
-      log.warn(
+      loginSpinner.fail(
         `Rate Limit Exceeded, trying to login again in ${minutes} minutes.`
       );
       setTimeout(() => {
@@ -73,7 +71,7 @@ client.on('error', (error) => {
       }, moment.duration(minutes, 'minutes'));
       break;
     case SteamUser.EResult.LogonSessionReplaced:
-      log.warn(
+      loginSpinner.fail(
         `Unexpected Disconnection!, you have LoggedIn with this same account in another place. Trying to login again in ${seconds} seconds.`
       );
       setTimeout(() => {
@@ -81,7 +79,7 @@ client.on('error', (error) => {
       }, moment.duration(seconds, 'seconds'));
       break;
     default:
-      log.warn(
+      loginSpinner.fail(
         `Unexpected Disconnection!, trying to login again in ${seconds} seconds.`
       );
       setTimeout(() => {

@@ -1,20 +1,22 @@
 import ProgressBar from 'cli-progress';
 import _ from 'lodash';
+import ora from 'ora';
 import util from 'util';
 
 import config from '../config/main.js';
 import getMyComments from './getMyComments.js';
-import log from './log.js';
 import { client, community } from './steamClient.js';
 import { delay } from './utils.js';
 
 const progressBar = new ProgressBar.Bar({
-  format: 'Removing comments [{bar}] {percentage}% ',
+  format:
+    'Removing comments |{bar}| {value}/{total} ({percentage}%) | ETA: {eta_formatted}',
   barCompleteChar: '\u2588',
   barIncompleteChar: '\u2591',
   hideCursor: true,
   clearOnComplete: true,
   emptyOnZero: true,
+  etaBuffer: 5,
 });
 
 const getCommentsOnMyProfile = util.promisify(
@@ -27,7 +29,8 @@ const deleteComment = util.promisify(
 
 async function getComments(mode, steamId) {
   if (mode === 1) {
-    return getCommentsMadeByMe();
+    const comments = await getCommentsMadeByMe();
+    return comments.filter((comment) => comment.steamId !== steamId);
   }
 
   const comments = await getCommentsOnMyProfile(steamId);
@@ -38,26 +41,27 @@ async function getComments(mode, steamId) {
 }
 
 export default async (mode) => {
+  let spinner;
+
   try {
     const modeLabel =
       mode === 1
         ? 'comments you made on other profiles'
         : 'comments made on this profile';
 
-    log.info(`Fetching ${modeLabel}...`);
+    spinner = ora(`Fetching ${modeLabel}...`).start();
 
-    const comments = await getComments(mode, client.steamID);
+    const comments = await getComments(mode, client.steamID.toString());
 
     if (comments.length === 0) {
-      log.info('No comments found to remove.');
+      spinner.warn('No comments found to remove.');
       return;
     }
 
-    log.info(`Found ${comments.length} comment(s). Starting removal...`);
+    spinner.info(`Found ${comments.length} comment(s). Starting removal...`);
 
     let commentsRemoved = 0;
 
-    console.clear();
     progressBar.start(comments.length, 0);
 
     const task = async (comment) => {
@@ -79,12 +83,12 @@ export default async (mode) => {
     progressBar.stop();
 
     if (commentsRemoved > 0) {
-      log.info(
+      spinner.succeed(
         `Operation completed: ${commentsRemoved}/${comments.length} comment(s) removed successfully.`
       );
     }
   } catch (error) {
-    console.clear();
-    log.error(`Failed to remove comments: ${error.message || error}`);
+    progressBar.stop();
+    spinner.fail(`Failed to remove comments: ${error.message || error}`);
   }
 };
