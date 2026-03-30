@@ -9,19 +9,30 @@ import { client, community } from './components/steamClient.js';
 import main from './config/main.js';
 
 async function askUser() {
-  const { mode } = await inquirer.prompt([
+  const { mode, filter } = await inquirer.prompt([
     {
       type: 'list',
       name: 'mode',
-      message: 'What do you want to do?',
+      message: 'Which comments would you like to remove?',
       choices: [
         { name: 'Remove the comments you made on other profiles', value: 1 },
-        { name: 'Remove the comments made on this profile', value: 2 },
+        { name: 'Remove the comments made on your profile', value: 2 },
       ],
+    },
+    {
+      type: 'list',
+      name: 'filter',
+      message: 'Which comments would you like to remove from your profile?',
+      choices: [
+        { name: 'Only comments made by others', value: 'others' },
+        { name: 'Only comments made by me', value: 'mine' },
+        { name: 'All comments', value: 'all' },
+      ],
+      when: (answers) => answers.mode && answers.mode === 2,
     },
   ]);
 
-  return mode;
+  return { mode, filter };
 }
 
 client.logOn({
@@ -44,8 +55,8 @@ client.on('webSession', async (value, cookies) => {
   community.setCookies(cookies);
   loginSpinner.succeed('Logged in successfully!');
 
-  const mode = await askUser();
-  await removeComments(mode);
+  const { mode, filter } = await askUser();
+  await removeComments(mode, filter);
   process.exit(0);
 });
 
