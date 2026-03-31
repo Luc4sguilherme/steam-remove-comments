@@ -16,6 +16,14 @@ export function useCommentRemoval(mode, filter, active) {
   const [error, setError] = useState(null);
   const cancelledRef = useRef(false);
 
+  const onPage = (page, count) => {
+    if (!cancelledRef.current) setProgress({ current: 0, total: count, page });
+  };
+  const onProgress = (current, total) => {
+    if (!cancelledRef.current)
+      setProgress((prev) => ({ ...prev, current, total }));
+  };
+
   const removeComments = useCallback(async () => {
     try {
       if (cancelledRef.current) return;
@@ -26,18 +34,11 @@ export function useCommentRemoval(mode, filter, active) {
         const res = await removeMyComments({
           community,
           steamId,
-          onPage: (page, count) => {
-            if (!cancelledRef.current)
-              setProgress({ current: 0, total: count, page });
-          },
-          onProgress: (current, total) => {
-            if (!cancelledRef.current)
-              setProgress((prev) => ({ ...prev, current, total }));
-          },
+          onPage,
+          onProgress,
         });
 
         if (!cancelledRef.current) setResult(res);
-
         return;
       }
 
@@ -46,14 +47,8 @@ export function useCommentRemoval(mode, filter, active) {
           community,
           steamId,
           filter,
-          onStart: (total) => {
-            if (!cancelledRef.current)
-              setProgress({ current: 0, total, page: null });
-          },
-          onProgress: (current, total) => {
-            if (!cancelledRef.current)
-              setProgress({ current, total, page: null });
-          },
+          onPage,
+          onProgress,
         });
 
         if (!cancelledRef.current) setResult(res);

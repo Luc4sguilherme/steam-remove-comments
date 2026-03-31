@@ -3,6 +3,7 @@ import util from 'util';
 
 import config from '../config/main.js';
 import { delay } from '../utils/delay.js';
+import getCommentsOnMyProfile from './getCommentsOnMyProfile.js';
 import getMyComments from './getMyComments.js';
 
 async function removeChunk({ comments, deleteComment, onItemRemoved }) {
@@ -59,13 +60,13 @@ export async function removeMyComments({
       totalComments += filtered.length;
       onPage(page, filtered.length);
 
-      let pageCurrent = 0;
+      let progress = 0;
       commentsRemoved += await removeChunk({
         comments: filtered,
         deleteComment,
         onItemRemoved: () => {
-          pageCurrent += 1;
-          onProgress(pageCurrent, filtered.length);
+          progress += 1;
+          onProgress(progress, filtered.length);
         },
       });
     }
@@ -78,44 +79,47 @@ export async function removeCommentsFromMyProfile({
   community,
   steamId,
   filter,
-  onStart,
+  onPage,
   onProgress,
 }) {
   const deleteComment = util.promisify(
     community.deleteUserComment.bind(community)
   );
-  const getCommentsOnMyProfile = util.promisify(
-    community.getUserComments.bind(community)
-  );
 
-  const rawComments = await getCommentsOnMyProfile(steamId);
-  const comments = rawComments
-    .map((comment) => ({
-      steamId: steamId.toString(),
-      authorId: comment.author.steamID.toString(),
-      commentId: comment.id,
-    }))
-    .filter((c) => {
-      if (filter === 'others') return c.authorId !== steamId;
-      if (filter === 'mine') return c.authorId === steamId;
-      return true;
-    });
+  let totalComments = 0;
+  let commentsRemoved = 0;
 
-  if (comments.length === 0) {
-    return { removed: 0, total: 0 };
+  for await (const { page, comments } of getCommentsOnMyProfile(
+    community,
+    steamId
+  )) {
+    const filtered = comments
+      .map((comment) => ({
+        steamId: steamId.toString(),
+        authorId: comment.author.steamID.toString(),
+        commentId: comment.id,
+      }))
+      .filter((c) => {
+        if (filter === 'others') return c.authorId !== steamId;
+        if (filter === 'mine') return c.authorId === steamId;
+        return true;
+      });
+
+    if (filtered.length > 0) {
+      totalComments += filtered.length;
+      onPage(page, filtered.length);
+
+      let progress = 0;
+      commentsRemoved += await removeChunk({
+        comments: filtered,
+        deleteComment,
+        onItemRemoved: () => {
+          progress += 1;
+          onProgress(progress, filtered.length);
+        },
+      });
+    }
   }
 
-  onStart(comments.length);
-
-  let current = 0;
-  const removed = await removeChunk({
-    comments,
-    deleteComment,
-    onItemRemoved: () => {
-      current += 1;
-      onProgress(current, comments.length);
-    },
-  });
-
-  return { removed, total: comments.length };
+  return { removed: commentsRemoved, total: totalComments };
 }
