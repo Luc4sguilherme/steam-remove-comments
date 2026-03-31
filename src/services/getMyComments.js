@@ -1,6 +1,8 @@
 import { load } from 'cheerio';
 
 import { delay } from '../utils/delay.js';
+import { getCommentsGenerator } from './getComments.js';
+import getSteamId64 from './getSteamId64.js';
 
 function getEndPage($, fallback) {
   const pageLinks = $('div.pageLinks a.pagelink');
@@ -21,7 +23,7 @@ function collectProfileLinks($, visitedProfiles) {
   $('div.commenthistory_comment:not(.deleted) a').each((i, el) => {
     const href = $(el).attr('href');
     if (href && matchLink.test(href)) {
-      const normalized = href.replace(/\/$/, '');
+      const normalized = href.replace(/\?tscn=\d+$/, '').replace(/\/$/, '');
       if (!visitedProfiles.has(normalized)) {
         visitedProfiles.add(normalized);
         newProfiles.push(normalized);
@@ -30,26 +32,6 @@ function collectProfileLinks($, visitedProfiles) {
   });
 
   return newProfiles;
-}
-
-function findOwnComments($) {
-  const results = [];
-  const seen = new Set();
-
-  $('a.actionlink:not(.report_and_hide)').each((i, el) => {
-    const href = $(el).attr('href') || '';
-    const matches = href.match(/'([^']+)'/g);
-    if (matches && matches.length >= 2) {
-      const steamId = matches[0].replace(/'/g, '').replace('Profile_', '');
-      const commentId = matches[1].replace(/'/g, '');
-      if (!seen.has(commentId)) {
-        seen.add(commentId);
-        results.push({ steamId, commentId });
-      }
-    }
-  });
-
-  return results;
 }
 
 async function fetchHistoryPage(
@@ -76,27 +58,10 @@ async function fetchHistoryPage(
       return fetchHistoryPage(steamcommunity, page, retries + 1, maxRetries);
     }
 
-    return null;
-  }
-}
-
-async function fetchProfile(steamcommunity, url, retries = 0, maxRetries = 5) {
-  try {
-    return await new Promise((resolve, reject) => {
-      steamcommunity.httpRequest(
-        url,
-        (err, response, body) => {
-          if (err) reject(err);
-          else resolve(body);
-        },
-        'steamcommunity'
-      );
-    });
-  } catch (err) {
-    if (retries < maxRetries) {
-      await delay(1000 * retries);
-      return fetchProfile(steamcommunity, url, retries + 1, maxRetries);
-    }
+    console.error(
+      `An error occurred while retrieving page ${page} from history.`,
+      err
+    );
 
     return null;
   }
@@ -110,7 +75,7 @@ async function fetchProfile(steamcommunity, url, retries = 0, maxRetries = 5) {
  * @param {number} [options.startPage=1] - The page to start from (1-indexed)
  * @param {number} [options.endPage] - The page to end at. Defaults to last page.
  */
-async function* getMyComments(steamcommunity, options = {}) {
+async function* getMyComments(steamcommunity, mySteamId, options = {}) {
   const visitedProfiles = new Set();
   const seenComments = new Set();
   let endPage = null;
@@ -134,14 +99,26 @@ async function* getMyComments(steamcommunity, options = {}) {
       const comments = [];
 
       for (const profileLink of profileLinks) {
-        const profileBody = await fetchProfile(steamcommunity, profileLink);
+        const steamId = await getSteamId64(profileLink);
 
-        if (profileBody !== null) {
-          const profileComments = findOwnComments(load(profileBody));
-          for (const comment of profileComments) {
-            if (!seenComments.has(comment.commentId)) {
-              seenComments.add(comment.commentId);
-              comments.push(comment);
+        if (steamId !== mySteamId) {
+          for await (const batch of getCommentsGenerator(
+            steamcommunity,
+            steamId
+          )) {
+            const filtered = batch.comments
+              .map((comment) => ({
+                profileId: steamId,
+                authorId: comment.author.steamID.toString(),
+                commentId: comment.id,
+              }))
+              .filter((c) => c.authorId === mySteamId);
+
+            for (const comment of filtered) {
+              if (!seenComments.has(comment.commentId)) {
+                seenComments.add(comment.commentId);
+                comments.push(comment);
+              }
             }
           }
         }

@@ -18,7 +18,7 @@ const WorkingStatus = ({ progress }) => (
         <Text color="cyan">
           <Spinner type="dots" />
         </Text>
-        <Text> Removing comments...</Text>
+        <Text> Fetching comments...</Text>
       </Box>
     )}
 
